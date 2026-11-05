@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>不敢说</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif;
+    background: #f7f5f2; color: #3a3a3a; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .container { width: 100%; max-width: 420px; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .prompt { font-size: 15px; line-height: 1.7; color: #8a8580; margin-bottom: 20px; text-align: center; }
+  textarea {
+    width: 100%; min-height: 160px; padding: 16px; border: 1px solid #e5e0da;
+    border-radius: 12px; background: #fff; font-size: 16px; line-height: 1.7;
+    color: #3a3a3a; resize: none; outline: none; font-family: inherit;
+  }
+  textarea:focus { border-color: #c9c2ba; }
+  textarea::placeholder { color: #c0bbb5; }
+  button {
+    width: 100%; margin-top: 16px; padding: 14px; border: none; border-radius: 12px;
+    background: #3a3a3a; color: #fff; font-size: 16px; cursor: pointer;
+    font-family: inherit; transition: opacity 0.2s;
+  }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.secondary { background: transparent; color: #8a8580; border: 1px solid #e5e0da; }
+  .echo {
+    font-size: 17px; line-height: 1.8; color: #3a3a3a; padding: 28px 20px;
+    background: #fff; border-radius: 12px; border: 1px solid #e5e0da;
+    text-align: center; min-height: 100px; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .loading { color: #c0bbb5; font-size: 15px; text-align: center; padding: 40px 0; }
+  .footnote { margin-top: 24px; font-size: 12px; color: #c0bbb5; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="screen active" id="screen-write">
+    <div class="prompt">今天有什么事，是你不敢告诉别人的？</div>
+    <textarea id="input" placeholder="写下来，只有你和这里知道。" maxlength="500"></textarea>
+    <button id="submit-btn" disabled>说出口</button>
+    <div class="footnote">写下的内容不会被保存。这里不是心理咨询，也不替代专业帮助。</div>
+  </div>
+
+  <div class="screen" id="screen-loading">
+    <div class="loading">……</div>
+  </div>
+
+  <div class="screen" id="screen-echo">
+    <div class="echo" id="echo-text"></div>
+    <button id="keep-btn" class="secondary">留着</button>
+    <button id="vanish-btn">让它消失</button>
+  </div>
+
+  <div class="screen" id="screen-done">
+    <div class="prompt">说出来了。</div>
+    <button id="restart-btn" class="secondary">再说一件事</button>
+  </div>
+
+</div>
+
+<script>
+const input = document.getElementById('input');
+const submitBtn = document.getElementById('submit-btn');
+const screens = {
+  write: document.getElementById('screen-write'),
+  loading: document.getElementById('screen-loading'),
+  echo: document.getElementById('screen-echo'),
+  done: document.getElementById('screen-done'),
+};
+let lastEcho = '';
+
+function show(name) {
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
+}
+
+input.addEventListener('input', () => {
+  submitBtn.disabled = input.value.trim().length === 0;
+});
+
+submitBtn.addEventListener('click', async () => {
+  const text = input.value.trim();
+  if (!text) return;
+  show('loading');
+  try {
+    const res = await fetch('/api/echo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error('request failed');
+    const data = await res.json();
+    lastEcho = data.echo || '我听见了。';
+  } catch (e) {
+    lastEcho = '刚才那句话，我听见了。';
+  }
+  document.getElementById('echo-text').textContent = lastEcho;
+  show('echo');
+});
+
+document.getElementById('keep-btn').addEventListener('click', () => {
+  if (navigator.clipboard) navigator.clipboard.writeText(lastEcho).catch(() => {});
+  show('done');
+});
+
+document.getElementById('vanish-btn').addEventListener('click', () => show('done'));
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  input.value = '';
+  submitBtn.disabled = true;
+  show('write');
+});
+</script>
+</body>
+</html>
